@@ -21,6 +21,7 @@ class ImVoxelNet2(ImVoxelNet):
         prior_generator,
         n_voxels,
         coord_type,
+        backbone_3d=None,
         aligned=False,
         mlvl_features=False,
         pooling=False,
@@ -43,6 +44,10 @@ class ImVoxelNet2(ImVoxelNet):
                          test_cfg=test_cfg,
                          data_preprocessor=data_preprocessor,
                          init_cfg=init_cfg)
+        if backbone_3d is None:
+          self.backbone_3d = None
+        else:
+          self.backbone_3d = MODELS.build(backbone_3d)
         self.aligned = aligned
         self.mlvl_features = mlvl_features
         self.pooling = pooling
@@ -106,6 +111,8 @@ class ImVoxelNet2(ImVoxelNet):
         volumes = mlvl_volumes
         valid_preds = mlvl_valid_preds
         x = torch.stack(volumes)
+        if self.backbone_3d is not None:
+            x = self.backbone_3d(x)
         x = self.neck_3d(x)
         return x, torch.stack(valid_preds).float()
 
