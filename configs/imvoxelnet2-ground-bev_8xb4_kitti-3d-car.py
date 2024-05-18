@@ -1,8 +1,6 @@
-_base_ = ['./imvoxelnet2_1xb4_kitti-3d-car.py']
+_base_ = './imvoxelnet2_8xb4_kitti-3d-car.py'
 
-model = dict(
-    neck_3d=dict(type='ImBEVNeck'),
-    use_ground_plane=True)
+model = dict(neck_3d=dict(type='ImBEVNeck'), use_ground_plane=True)
 
 meta_keys = [
     'img_path', 'ori_shape', 'img_shape', 'lidar2img', 'depth2img', 'cam2img',
@@ -20,11 +18,8 @@ _base_.test_pipeline[-1].update(meta_keys=meta_keys)
 
 train_dataloader = dict(
     batch_size=8,
-    dataset=dict(
-        dataset=dict(
-            pipeline=_base_.train_pipeline)))
+    dataset=dict(dataset=dict(pipeline=_base_.train_pipeline)))
 val_dataloader = dict(
     batch_size=8,
-    dataset=dict(
-        pipeline=_base_.test_pipeline))
+    dataset=dict(pipeline=_base_.test_pipeline))
 test_dataloader = val_dataloader
