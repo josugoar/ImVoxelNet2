@@ -58,14 +58,12 @@ class ImBEVNeck(BaseModule):
         """Forward function.
 
         Args:
-            x (torch.Tensor): of shape (N, C_in, N_x, N_y, N_z).
+            x (torch.Tensor): of shape (N, C_in * N_z, N_y, N_x).
 
         Returns:
             list[torch.Tensor]: of shape (N, C_out, N_y, N_x).
         """
-        x = self.model.forward(x.permute(0, 1, 4, 2, 3).flatten(1, 2))
-        # Anchor3DHead axis order is (y, x).
-        return [x.transpose(-1, -2)]
+        return self.model.forward(x)
 
     def init_weights(self):
         """Initialize weights of neck."""

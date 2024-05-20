@@ -26,6 +26,7 @@ class ImVoxelNet2(ImVoxelNet):
         mlvl_features=False,
         pooling=False,
         use_ground_plane=False,
+        bev=True,
         train_cfg=None,
         test_cfg=None,
         data_preprocessor=None,
@@ -44,14 +45,18 @@ class ImVoxelNet2(ImVoxelNet):
                          test_cfg=test_cfg,
                          data_preprocessor=data_preprocessor,
                          init_cfg=init_cfg)
-        if backbone_3d is None:
-          self.backbone_3d = None
-        else:
-          self.backbone_3d = MODELS.build(backbone_3d)
+        if backbone_3d is not None:
+            self.backbone_3d = MODELS.build(backbone_3d)
         self.aligned = aligned
         self.mlvl_features = mlvl_features
         self.pooling = pooling
         self.use_ground_plane = use_ground_plane
+        self.bev = bev
+
+    @property
+    def with_backbone_3d(self):
+        """Whether the detector has a 3D backbone."""
+        return hasattr(self, 'backbone_3d') and self.backbone_3d is not None
 
     def extract_feat(self, batch_inputs_dict,
                      batch_data_samples):
@@ -111,7 +116,13 @@ class ImVoxelNet2(ImVoxelNet):
         volumes = mlvl_volumes
         valid_preds = mlvl_valid_preds
         x = torch.stack(volumes)
-        if self.backbone_3d is not None:
+        if self.bev:
+            x = x.permute(0, 1, 4, 2, 3)
+            # TODO: voxel pooling
+            x = x.flatten(1, 2)
+            # Anchor3DHead axis order is (y, x).
+            x = x.transpose(-1, -2)
+        if self.with_backbone_3d:
             x = self.backbone_3d(x)
         x = self.neck_3d(x)
         return x, torch.stack(valid_preds).float()
