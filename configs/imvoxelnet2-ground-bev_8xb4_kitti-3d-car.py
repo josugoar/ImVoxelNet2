@@ -22,4 +22,4 @@ train_dataloader = dict(
 val_dataloader = dict(
     batch_size=8,
     dataset=dict(pipeline=_base_.test_pipeline))
-test_dataloader = val_dataloader
+test_dataloader = dict(dataset=dict(pipeline=_base_.test_pipeline))
