@@ -1,4 +1,6 @@
 import torch
+from mmcv.cnn import ConvModule
+from torch import nn
 from torch.nn import functional as F
 
 from mmdet3d.models.detectors import ImVoxelNet
@@ -26,7 +28,10 @@ class ImVoxelNet2(ImVoxelNet):
         mlvl_features=False,
         pooling=False,
         use_ground_plane=False,
-        bev=True,
+        bev=False,
+        middle_in_channels=None,
+        middle_out_channels=None,
+        voxel_pooling=None,
         train_cfg=None,
         test_cfg=None,
         data_preprocessor=None,
@@ -52,6 +57,19 @@ class ImVoxelNet2(ImVoxelNet):
         self.pooling = pooling
         self.use_ground_plane = use_ground_plane
         self.bev = bev
+        if bev:
+            if voxel_pooling is None or voxel_pooling == "linear":
+                pooling_layer = nn.Linear(middle_in_channels, middle_out_channels, bias=False)
+            elif voxel_pooling == "max":
+                pooling_layer = nn.AdaptiveMaxPool1d(middle_out_channels)
+            elif voxel_pooling == "avg":
+                pooling_layer = nn.AdaptiveAvgPool1d(middle_out_channels)
+            else:
+                raise ValueError(f"Invalid voxel pooling type {voxel_pooling}")
+            self.voxel_pooling = nn.Sequential(
+                    pooling_layer,
+                    nn.BatchNorm1d(middle_out_channels),
+                    nn.ReLU(inplace=True))
 
     @property
     def with_backbone_3d(self):
@@ -117,13 +135,19 @@ class ImVoxelNet2(ImVoxelNet):
         valid_preds = mlvl_valid_preds
         x = torch.stack(volumes)
         if self.bev:
-            x = x.permute(0, 1, 4, 2, 3)
-            # TODO: voxel pooling
+            N, _, N_x, N_y, _ = x.size()
+            x = x.permute(0, 2, 3, 1, 4)
+            x = x.flatten(0, 2)
             x = x.flatten(1, 2)
+            x = self.voxel_pooling(x)
+            x = x.view(N, N_x, N_y, -1)
+            x = x.permute(0, 3, 1, 2)
             # Anchor3DHead axis order is (y, x).
             x = x.transpose(-1, -2)
         if self.with_backbone_3d:
+            prev_x = x
             x = self.backbone_3d(x)
+            x = (prev_x, *x)
         x = self.neck_3d(x)
         return x, torch.stack(valid_preds).float()
 

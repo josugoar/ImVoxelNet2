@@ -14,7 +14,7 @@ class ImBEVNeck(BaseModule):
         out_channels (int): Number of channels in all output tensors.
     """
 
-    def __init__(self, in_channels, out_channels, feat_channels=None):
+    def __init__(self, in_channels, out_channels):
         super(ImBEVNeck, self).__init__()
         self.model = nn.Sequential(
             ResModule(in_channels, in_channels),
@@ -44,15 +44,6 @@ class ImBEVNeck(BaseModule):
                 conv_cfg=dict(type='Conv2d'),
                 norm_cfg=dict(type='BN2d'),
                 act_cfg=dict(type='ReLU', inplace=True)))
-        if feat_channels is not None:
-            self.model.insert(0, ConvModule(
-                in_channels=feat_channels,
-                out_channels=in_channels,
-                kernel_size=1,
-                padding=0,
-                conv_cfg=dict(type='Conv2d'),
-                norm_cfg=dict(type='BN2d'),
-                act_cfg=dict(type='ReLU', inplace=True)))
 
     def forward(self, x):
         """Forward function.
@@ -63,7 +54,8 @@ class ImBEVNeck(BaseModule):
         Returns:
             list[torch.Tensor]: of shape (N, C_out, N_y, N_x).
         """
-        return self.model.forward(x)
+        x = self.model.forward(x)
+        return [x]
 
     def init_weights(self):
         """Initialize weights of neck."""
@@ -115,10 +107,10 @@ class ResModule(nn.Module):
         """Forward function.
 
         Args:
-            x (torch.Tensor): of shape (N, C, N_x, N_y, N_z).
+            x (torch.Tensor): of shape (N, C * N_z, N_y, N_x).
 
         Returns:
-            torch.Tensor: 5d feature map.
+            torch.Tensor: 4d feature map.
         """
         identity = x
         x = self.conv0(x)
