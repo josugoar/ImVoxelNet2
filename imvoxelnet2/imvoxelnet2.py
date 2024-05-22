@@ -32,6 +32,7 @@ class ImVoxelNet2(ImVoxelNet):
         middle_in_channels=None,
         middle_out_channels=None,
         voxel_pooling=None,
+        prev_feats=False,
         train_cfg=None,
         test_cfg=None,
         data_preprocessor=None,
@@ -57,7 +58,8 @@ class ImVoxelNet2(ImVoxelNet):
         self.pooling = pooling
         self.use_ground_plane = use_ground_plane
         self.bev = bev
-        if bev:
+        self.prev_feats = prev_feats
+        if bev and middle_in_channels is not None and middle_out_channels is not None:
             if voxel_pooling is None or voxel_pooling == "linear":
                 pooling_layer = nn.Linear(middle_in_channels, middle_out_channels, bias=False)
             elif voxel_pooling == "max":
@@ -70,6 +72,8 @@ class ImVoxelNet2(ImVoxelNet):
                     pooling_layer,
                     nn.BatchNorm1d(middle_out_channels),
                     nn.ReLU(inplace=True))
+        else:
+            self.voxel_pooling = nn.Identity()
 
     @property
     def with_backbone_3d(self):
@@ -147,7 +151,8 @@ class ImVoxelNet2(ImVoxelNet):
         if self.with_backbone_3d:
             prev_x = x
             x = self.backbone_3d(x)
-            x = (prev_x, *x)
+            if self.prev_feats:
+                x = (prev_x, *x)
         x = self.neck_3d(x)
         return x, torch.stack(valid_preds).float()
 
