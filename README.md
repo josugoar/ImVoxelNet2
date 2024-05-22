@@ -1,7 +1,10 @@
 # ImVoxelNet++
 
-* Multilevel feature fusion via volume averaging
+* Projected feature extraction
 * Bilinear grid sampling interpolation
-* Volume to bird's eye view reduction
-* Ground plane volume construction
+* Multilevel feature fusion via volume averaging
 * Volume feature projection average pooling sampling
+* Ground plane volume construction
+* Volume to bird's eye view reduction
+* Multiple voxel pooling strategies to reduce volume
+* Unprocessed feature passing
