@@ -276,5 +276,6 @@ def point_sample(img_meta,
 
     return point_features.squeeze().t()
 
+
 def integral_image(features):
     return torch.cumsum(torch.cumsum(features, dim=-1), dim=-2)
