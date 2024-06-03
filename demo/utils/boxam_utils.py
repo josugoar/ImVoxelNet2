@@ -166,11 +166,11 @@ class BoxAMDetectorWrapper(nn.Module):
         self.checkpoint = checkpoint
         self.detector = init_detector(self.cfg, self.checkpoint, device=device)
 
-        test_pipeline_cfg = copy.deepcopy(self.cfg.test_dataloader.dataset.pipeline)
-        test_pipeline_cfg[0].type = 'mmdet3d.LoadImageFromNDArray'
+        pipeline_cfg = copy.deepcopy(self.cfg.test_dataloader.dataset.pipeline)
+        pipeline_cfg[0].type = 'mmdet3d.LoadImageFromNDArray'
 
-        new_pipeline = []
-        for pipeline in test_pipeline_cfg:
+        new_test_pipeline = []
+        for pipeline in pipeline_cfg:
             # FIX: AttributeError: 'InstanceData' object has no attribute 'bboxes_3d'
             if pipeline['type'].endswith('Pack3DDetInputs'):
                 pipeline['keys'].extend(['gt_bboxes',
@@ -180,8 +180,8 @@ class BoxAMDetectorWrapper(nn.Module):
                                          'centers_2d',
                                          'depths'])
             if not pipeline['type'].endswith('LoadAnnotations3D'):
-                new_pipeline.append(pipeline)
-        self.test_pipeline = Compose(new_pipeline)
+                new_test_pipeline.append(pipeline)
+        self.test_pipeline = Compose(new_test_pipeline)
 
         self.is_need_loss = False
         self.input_data = None
