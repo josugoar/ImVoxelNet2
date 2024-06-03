@@ -8,7 +8,7 @@ from mmengine import Config, DictAction
 from mmengine.registry import init_default_scope
 
 from mmdet3d.registry import MODELS
-from mmdet3d.structures.det3d_data_sample import Det3DDataSample
+from mmdet3d.structures import Det3DDataSample
 
 try:
     from mmcv.cnn import get_model_complexity_info
