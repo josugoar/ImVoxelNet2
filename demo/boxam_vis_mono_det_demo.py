@@ -13,9 +13,8 @@ except ImportError:
     raise ImportError('Please run `pip install "grad-cam"` to install '
                       'pytorch_grad_cam package.')
 
-from .utils.boxam_utils import (BoxAMDetectorVisualizer,
-                                BoxAMDetectorWrapper, DetAblationLayer,
-                                DetBoxScoreTarget, GradCAM,
+from .utils.boxam_utils import (BoxAMDetectorVisualizer, BoxAMDetectorWrapper,
+                                DetAblationLayer, DetBoxScoreTarget, GradCAM,
                                 GradCAMPlusPlus, reshape_transform)
 
 GRAD_FREE_METHOD_MAP = {
@@ -41,22 +40,19 @@ def parse_args():
     parser.add_argument('infos', help='Infos file with annotations')
     parser.add_argument('config', help='Config file')
     parser.add_argument('checkpoint', help='Checkpoint file')
-    parser.add_argument(
-        '--cam-type',
-        type=str,
-        default='CAM2',
-        help='choose camera type to inference')
-    parser.add_argument(
-        '--ignore-loss-params',
-        nargs='+',
-        type=str,
-        help='exclude specific keys')
-    parser.add_argument(
-        '--method',
-        default='gradcam',
-        choices=ALL_SUPPORT_METHODS,
-        help='Type of method to use, supports '
-        f'{", ".join(ALL_SUPPORT_METHODS)}.')
+    parser.add_argument('--cam-type',
+                        type=str,
+                        default='CAM2',
+                        help='choose camera type to inference')
+    parser.add_argument('--ignore-loss-params',
+                        nargs='+',
+                        type=str,
+                        help='exclude specific keys')
+    parser.add_argument('--method',
+                        default='gradcam',
+                        choices=ALL_SUPPORT_METHODS,
+                        help='Type of method to use, supports '
+                        f'{", ".join(ALL_SUPPORT_METHODS)}.')
     parser.add_argument(
         '--target-layers',
         default=['neck.fpn_convs[-1]'],
@@ -64,34 +60,38 @@ def parse_args():
         type=str,
         help='The target layers to get Box AM, if not set, the tool will '
         'specify the neck.fpn_convs[-1]')
-    parser.add_argument(
-        '--out-dir', default='./output', help='Path to output file')
-    parser.add_argument(
-        '--show', action='store_true', help='Show the CAM results')
-    parser.add_argument(
-        '--device', default='cuda:0', help='Device used for inference')
-    parser.add_argument(
-        '--score-thr', type=float, default=0.3, help='Bbox score threshold')
+    parser.add_argument('--out-dir',
+                        default='./output',
+                        help='Path to output file')
+    parser.add_argument('--show',
+                        action='store_true',
+                        help='Show the CAM results')
+    parser.add_argument('--device',
+                        default='cuda:0',
+                        help='Device used for inference')
+    parser.add_argument('--score-thr',
+                        type=float,
+                        default=0.3,
+                        help='Bbox score threshold')
     parser.add_argument(
         '--topk',
         type=int,
         default=-1,
         help='Select topk predict resutls to show. -1 are mean all.')
-    parser.add_argument(
-        '--max-shape',
-        nargs='+',
-        type=int,
-        default=-1,
-        help='max shapes. Its purpose is to save GPU memory. '
-        'The activation map is scaled and then evaluated. '
-        'If set to -1, it means no scaling.')
-    parser.add_argument(
-        '--preview-model',
-        default=False,
-        action='store_true',
-        help='To preview all the model layers')
-    parser.add_argument(
-        '--norm-in-bbox', action='store_true', help='Norm in bbox of am image')
+    parser.add_argument('--max-shape',
+                        nargs='+',
+                        type=int,
+                        default=-1,
+                        help='max shapes. Its purpose is to save GPU memory. '
+                        'The activation map is scaled and then evaluated. '
+                        'If set to -1, it means no scaling.')
+    parser.add_argument('--preview-model',
+                        default=False,
+                        action='store_true',
+                        help='To preview all the model layers')
+    parser.add_argument('--norm-in-bbox',
+                        action='store_true',
+                        help='Norm in bbox of am image')
     parser.add_argument(
         '--cfg-options',
         nargs='+',
@@ -103,11 +103,10 @@ def parse_args():
         'Note that the quotation marks are necessary and that no white space '
         'is allowed.')
     # Only used by AblationCAM
-    parser.add_argument(
-        '--batch-size',
-        type=int,
-        default=1,
-        help='batch of inference of AblationCAM')
+    parser.add_argument('--batch-size',
+                        type=int,
+                        default=1,
+                        help='batch of inference of AblationCAM')
     parser.add_argument(
         '--ratio-channels-to-ablate',
         type=int,
@@ -125,8 +124,10 @@ def init_detector_and_visualizer(args, cfg):
         max_shape = [args.max_shape]
     assert len(max_shape) == 1 or len(max_shape) == 2
 
-    model_wrapper = BoxAMDetectorWrapper(
-        cfg, args.checkpoint, args.score_thr, device=args.device)
+    model_wrapper = BoxAMDetectorWrapper(cfg,
+                                         args.checkpoint,
+                                         args.score_thr,
+                                         device=args.device)
 
     if args.preview_model:
         print(model_wrapper.detector)
@@ -159,8 +160,9 @@ def init_detector_and_visualizer(args, cfg):
         method_class,
         model_wrapper,
         target_layers,
-        reshape_transform=partial(
-            reshape_transform, max_shape=max_shape, is_need_grad=is_need_grad),
+        reshape_transform=partial(reshape_transform,
+                                  max_shape=max_shape,
+                                  is_need_grad=is_need_grad),
         is_need_grad=is_need_grad,
         extra_params=ablationcam_extra_params)
     return model_wrapper, boxam_detector_visualizer
@@ -191,7 +193,8 @@ def main():
 
     pred_instances_3d = result.pred_instances_3d
     # Get candidate predict info with score threshold
-    pred_instances_3d = pred_instances_3d[pred_instances_3d.scores_3d > args.score_thr]
+    pred_instances_3d = pred_instances_3d[pred_instances_3d.scores_3d >
+                                          args.score_thr]
 
     if len(pred_instances_3d) == 0:
         warnings.warn('empty detection results! skip this')
@@ -200,17 +203,14 @@ def main():
             pred_instances_3d = pred_instances_3d[:args.topk]
 
         targets = [
-            DetBoxScoreTarget(
-                pred_instances_3d,
-                device=args.device,
-                ignore_loss_params=ignore_loss_params)
+            DetBoxScoreTarget(pred_instances_3d,
+                              device=args.device,
+                              ignore_loss_params=ignore_loss_params)
         ]
 
         if args.method in GRAD_BASED_METHOD_MAP:
             model_wrapper.need_loss(True)
-            model_wrapper.set_input_data(image,
-                                         args.infos,
-                                         args.cam_type,
+            model_wrapper.set_input_data(image, args.infos, args.cam_type,
                                          pred_instances_3d)
             boxam_detector_visualizer.switch_activations_and_grads(
                 model_wrapper)
@@ -220,7 +220,8 @@ def main():
 
         # draw cam on image
         pred_instances_3d = pred_instances_3d.numpy()
-        cam2img = model_wrapper.input_data['data_samples'][0].metainfo['cam2img']
+        cam2img = model_wrapper.input_data['data_samples'][0].metainfo[
+            'cam2img']
         image_with_bounding_boxes = boxam_detector_visualizer.show_am(
             image,
             pred_instances_3d,

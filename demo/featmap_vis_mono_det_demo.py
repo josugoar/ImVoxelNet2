@@ -18,13 +18,13 @@ def parse_args():
     parser.add_argument('infos', help='Infos file with annotations')
     parser.add_argument('config', help='Config file')
     parser.add_argument('checkpoint', help='Checkpoint file')
-    parser.add_argument(
-        '--cam-type',
-        type=str,
-        default='CAM2',
-        help='choose camera type to inference')
-    parser.add_argument(
-        '--out-dir', default='./output', help='Path to output file')
+    parser.add_argument('--cam-type',
+                        type=str,
+                        default='CAM2',
+                        help='choose camera type to inference')
+    parser.add_argument('--out-dir',
+                        default='./output',
+                        help='Path to output file')
     parser.add_argument(
         '--target-layers',
         default=['backbone'],
@@ -32,21 +32,23 @@ def parse_args():
         type=str,
         help='The target layers to get feature map, if not set, the tool will '
         'specify the backbone')
-    parser.add_argument(
-        '--preview-model',
-        default=False,
-        action='store_true',
-        help='To preview all the model layers')
-    parser.add_argument(
-        '--device', default='cuda:0', help='Device used for inference')
-    parser.add_argument(
-        '--score-thr', type=float, default=0.3, help='Bbox score threshold')
-    parser.add_argument(
-        '--show', action='store_true', help='Show the featmap results')
-    parser.add_argument(
-        '--channel-reduction',
-        default='select_max',
-        help='Reduce multiple channels to a single channel')
+    parser.add_argument('--preview-model',
+                        default=False,
+                        action='store_true',
+                        help='To preview all the model layers')
+    parser.add_argument('--device',
+                        default='cuda:0',
+                        help='Device used for inference')
+    parser.add_argument('--score-thr',
+                        type=float,
+                        default=0.3,
+                        help='Bbox score threshold')
+    parser.add_argument('--show',
+                        action='store_true',
+                        help='Show the featmap results')
+    parser.add_argument('--channel-reduction',
+                        default='select_max',
+                        help='Reduce multiple channels to a single channel')
     parser.add_argument(
         '--topk',
         type=int,
@@ -138,7 +140,8 @@ def main():
 
     image_path = args.img
 
-    result, featmaps = activations_wrapper(image_path, args.infos, args.cam_type)
+    result, featmaps = activations_wrapper(image_path, args.infos,
+                                           args.cam_type)
     if not isinstance(featmaps, Sequence):
         featmaps = [featmaps]
 
@@ -157,16 +160,15 @@ def main():
 
     # show the results
     shown_imgs = []
-    visualizer.add_datasample(
-        'result',
-        dict(img=img),
-        data_sample=result,
-        draw_gt=False,
-        show=False,
-        wait_time=0,
-        out_file=None,
-        vis_task='mono_det',
-        pred_score_thr=args.score_thr)
+    visualizer.add_datasample('result',
+                              dict(img=img),
+                              data_sample=result,
+                              draw_gt=False,
+                              show=False,
+                              wait_time=0,
+                              out_file=None,
+                              vis_task='mono_det',
+                              pred_score_thr=args.score_thr)
     drawn_img = visualizer.get_image()
 
     for featmap in flatten_featmaps:

@@ -143,8 +143,9 @@ def reshape_transform(feats: Union[Tensor, List[Tensor]],
     activations = []
     for feat in feats:
         activations.append(
-            torch.nn.functional.interpolate(
-                torch.abs(feat), max_shape, mode='bilinear'))
+            torch.nn.functional.interpolate(torch.abs(feat),
+                                            max_shape,
+                                            mode='bilinear'))
 
     activations = torch.cat(activations, axis=1)
     return activations
@@ -173,12 +174,10 @@ class BoxAMDetectorWrapper(nn.Module):
         for pipeline in pipeline_cfg:
             # FIX: AttributeError: 'InstanceData' object has no attribute 'bboxes_3d'
             if pipeline['type'].endswith('Pack3DDetInputs'):
-                pipeline['keys'].extend(['gt_bboxes',
-                                         'gt_bboxes_labels',
-                                         'gt_bboxes_3d',
-                                         'gt_labels_3d',
-                                         'centers_2d',
-                                         'depths'])
+                pipeline['keys'].extend([
+                    'gt_bboxes', 'gt_bboxes_labels', 'gt_bboxes_3d',
+                    'gt_labels_3d', 'centers_2d', 'depths'
+                ])
             if not pipeline['type'].endswith('LoadAnnotations3D'):
                 new_test_pipeline.append(pipeline)
         self.test_pipeline = Compose(new_test_pipeline)
@@ -211,20 +210,19 @@ class BoxAMDetectorWrapper(nn.Module):
                 pred_instances.bboxes_3d.gravity_center.numpy(force=True),
                 data_info['images'][cam_type]['cam2img'],
                 with_depth=True)
-            data = dict(
-                img=self.image,
-                img_id=0,
-                **data_info['images'][cam_type],
-                box_type_3d=box_type_3d,
-                box_mode_3d=box_mode_3d,
-                gt_bboxes=box3d_to_bbox(
-                    pred_instances.bboxes_3d.tensor.numpy(force=True),
-                    data_info['images'][cam_type]['cam2img']),
-                gt_bboxes_labels=pred_instances.labels_3d,
-                gt_bboxes_3d=pred_instances.bboxes_3d,
-                gt_labels_3d=pred_instances.labels_3d,
-                centers_2d=centers_2d_with_depth[:, :2],
-                depths=centers_2d_with_depth[:, 2])
+            data = dict(img=self.image,
+                        img_id=0,
+                        **data_info['images'][cam_type],
+                        box_type_3d=box_type_3d,
+                        box_mode_3d=box_mode_3d,
+                        gt_bboxes=box3d_to_bbox(
+                            pred_instances.bboxes_3d.tensor.numpy(force=True),
+                            data_info['images'][cam_type]['cam2img']),
+                        gt_bboxes_labels=pred_instances.labels_3d,
+                        gt_bboxes_3d=pred_instances.bboxes_3d,
+                        gt_labels_3d=pred_instances.labels_3d,
+                        centers_2d=centers_2d_with_depth[:, :2],
+                        depths=centers_2d_with_depth[:, 2])
             data = self.test_pipeline(data)
         else:
             data = dict(img=self.image,
@@ -357,13 +355,12 @@ class BoxAMDetectorVisualizer:
         else:
             renormalized_am = grayscale_am
 
-        am_image_renormalized = show_cam_on_image(
-            image / 255, renormalized_am, use_rgb=False)
+        am_image_renormalized = show_cam_on_image(image / 255,
+                                                  renormalized_am,
+                                                  use_rgb=False)
 
         image_with_bounding_boxes = self._draw_boxes(
-            boxes,
-            labels,
-            am_image_renormalized,
+            boxes, labels, am_image_renormalized,
             pred_instance_3d.get('scores_3d'))
         return image_with_bounding_boxes
 
@@ -385,14 +382,13 @@ class BoxAMDetectorVisualizer:
             else:
                 text = self.classes[label]
 
-            cv2.putText(
-                image,
-                text, (int(box[0]), int(box[1] - 5)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                color,
-                1,
-                lineType=cv2.LINE_AA)
+            cv2.putText(image,
+                        text, (int(box[0]), int(box[1] - 5)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        color,
+                        1,
+                        lineType=cv2.LINE_AA)
         return image
 
 

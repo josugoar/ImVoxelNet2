@@ -60,7 +60,9 @@ class ImVoxelNet2(ImVoxelNet):
         self.prev_feats = prev_feats
         if bev and middle_in_channels is not None and middle_out_channels is not None:
             if voxel_pooling is None or voxel_pooling == "linear":
-                pooling_layer = nn.Linear(middle_in_channels, middle_out_channels, bias=False)
+                pooling_layer = nn.Linear(middle_in_channels,
+                                          middle_out_channels,
+                                          bias=False)
             elif voxel_pooling == "max":
                 pooling_layer = nn.AdaptiveMaxPool1d(middle_out_channels)
             elif voxel_pooling == "avg":
@@ -68,9 +70,8 @@ class ImVoxelNet2(ImVoxelNet):
             else:
                 raise ValueError(f"Invalid voxel pooling type {voxel_pooling}")
             self.voxel_pooling = nn.Sequential(
-                    pooling_layer,
-                    nn.BatchNorm1d(middle_out_channels),
-                    nn.ReLU(inplace=True))
+                pooling_layer, nn.BatchNorm1d(middle_out_channels),
+                nn.ReLU(inplace=True))
         else:
             self.voxel_pooling = nn.Identity()
 
@@ -79,8 +80,7 @@ class ImVoxelNet2(ImVoxelNet):
         """Whether the detector has a 3D backbone."""
         return hasattr(self, 'backbone_3d') and self.backbone_3d is not None
 
-    def extract_feat(self, batch_inputs_dict,
-                     batch_data_samples):
+    def extract_feat(self, batch_inputs_dict, batch_data_samples):
         img = batch_inputs_dict['imgs']
         batch_img_metas = [
             data_samples.metainfo for data_samples in batch_data_samples
@@ -102,31 +102,32 @@ class ImVoxelNet2(ImVoxelNet):
                 points[:, 2] = -img_meta['plane'][3]
             volumes, valid_preds = [], []
             for feature in features:
-                img_scale_factor = (
-                    points.new_tensor(img_meta['scale_factor'][:2])
-                    if 'scale_factor' in img_meta.keys() else 1)
-                img_flip = img_meta['flip'] if 'flip' in img_meta.keys() else False
-                img_crop_offset = (
-                    points.new_tensor(img_meta['img_crop_offset'])
-                    if 'img_crop_offset' in img_meta.keys() else 0)
+                img_scale_factor = (points.new_tensor(
+                    img_meta['scale_factor'][:2]) if 'scale_factor'
+                                    in img_meta.keys() else 1)
+                img_flip = img_meta['flip'] if 'flip' in img_meta.keys(
+                ) else False
+                img_crop_offset = (points.new_tensor(
+                    img_meta['img_crop_offset']) if 'img_crop_offset'
+                                   in img_meta.keys() else 0)
                 proj_mat = points.new_tensor(
                     get_proj_mat_by_coord_type(img_meta, self.coord_type))
-                volume = point_sample(
-                    img_meta,
-                    img_features=feature[None, ...],
-                    points=points,
-                    proj_mat=points.new_tensor(proj_mat),
-                    coord_type=self.coord_type,
-                    img_scale_factor=img_scale_factor,
-                    img_crop_offset=img_crop_offset,
-                    img_flip=img_flip,
-                    img_pad_shape=img.shape[-2:],
-                    img_shape=img_meta['img_shape'][:2],
-                    aligned=self.aligned,
-                    pooling=self.pooling,
-                    n_voxels=n_voxels)
+                volume = point_sample(img_meta,
+                                      img_features=feature[None, ...],
+                                      points=points,
+                                      proj_mat=points.new_tensor(proj_mat),
+                                      coord_type=self.coord_type,
+                                      img_scale_factor=img_scale_factor,
+                                      img_crop_offset=img_crop_offset,
+                                      img_flip=img_flip,
+                                      img_pad_shape=img.shape[-2:],
+                                      img_shape=img_meta['img_shape'][:2],
+                                      aligned=self.aligned,
+                                      pooling=self.pooling,
+                                      n_voxels=n_voxels)
                 volumes.append(
-                    volume.reshape(self.n_voxels[::-1] + [-1]).permute(3, 2, 1, 0))
+                    volume.reshape(self.n_voxels[::-1] + [-1]).permute(
+                        3, 2, 1, 0))
                 valid_preds.append(
                     ~torch.all(volumes[-1] == 0, dim=0, keepdim=True))
             valid_pred = torch.stack(valid_preds).sum(0)
@@ -173,8 +174,10 @@ def point_sample(img_meta,
                  pooling=False,
                  n_voxels=None):
     # apply transformation based on info in img_meta
-    points = apply_3d_transformation(
-        points, coord_type, img_meta, reverse=True)
+    points = apply_3d_transformation(points,
+                                     coord_type,
+                                     img_meta,
+                                     reverse=True)
 
     # project points to image coordinate
     if valid_flag:
@@ -202,7 +205,8 @@ def point_sample(img_meta,
     norm_coor_y = coor_y / h * 2 - 1
     norm_coor_x = coor_x / w * 2 - 1
     grid = torch.cat([norm_coor_x, norm_coor_y],
-                     dim=1).unsqueeze(0).unsqueeze(0).clamp(-1 - EPSILON, 1 + EPSILON)  # Nx2 -> 1x1xNx2
+                     dim=1).unsqueeze(0).unsqueeze(0).clamp(
+                         -1 - EPSILON, 1 + EPSILON)  # Nx2 -> 1x1xNx2
 
     # align_corner=True provides higher performance
     mode = 'bilinear' if aligned else 'nearest'
@@ -215,13 +219,15 @@ def point_sample(img_meta,
             align_corners=align_corners)  # 1xCx1xN feats
     else:
         # Get top-left and bottom-right coordinates of voxel bounding boxes
-        norm_corners = grid.view(1, *n_voxels[::-1], 2).permute([0, 1, 3, 2, 4])
+        norm_corners = grid.view(1, *n_voxels[::-1],
+                                 2).permute([0, 1, 3, 2, 4])
         bbox_corners = torch.cat([
-            torch.min(norm_corners[:, :-1, :-1, :-1],
-                      norm_corners[:, :-1, 1:, :-1]),
-            torch.max(norm_corners[:, 1:, 1:, 1:],
-                      norm_corners[:, 1:, :-1, 1:]),
-        ], dim=-1)
+            torch.min(norm_corners[:, :-1, :-1, :-1], norm_corners[:, :-1,
+                                                                   1:, :-1]),
+            torch.max(norm_corners[:, 1:, 1:, 1:], norm_corners[:, 1:, :-1,
+                                                                1:]),
+        ],
+                                 dim=-1)
         batch, _, depth, width, _ = bbox_corners.size()
         bbox_corners = bbox_corners.flatten(2, 3)
 
@@ -234,42 +240,39 @@ def point_sample(img_meta,
         # Sample integral image at bounding box locations
         features = img_features
         integral_img = integral_image(features)
-        top_left = F.grid_sample(
-            integral_img,
-            bbox_corners[..., [0, 1]],
-            mode=mode,
-            padding_mode=padding_mode,
-            align_corners=align_corners)
-        btm_right = F.grid_sample(
-            integral_img,
-            bbox_corners[..., [2, 3]],
-            mode=mode,
-            padding_mode=padding_mode,
-            align_corners=align_corners)
-        top_right = F.grid_sample(
-            integral_img,
-            bbox_corners[..., [2, 1]],
-            mode=mode,
-            padding_mode=padding_mode,
-            align_corners=align_corners)
-        btm_left = F.grid_sample(
-            integral_img,
-            bbox_corners[..., [0, 3]],
-            mode=mode,
-            padding_mode=padding_mode,
-            align_corners=align_corners)
+        top_left = F.grid_sample(integral_img,
+                                 bbox_corners[..., [0, 1]],
+                                 mode=mode,
+                                 padding_mode=padding_mode,
+                                 align_corners=align_corners)
+        btm_right = F.grid_sample(integral_img,
+                                  bbox_corners[..., [2, 3]],
+                                  mode=mode,
+                                  padding_mode=padding_mode,
+                                  align_corners=align_corners)
+        top_right = F.grid_sample(integral_img,
+                                  bbox_corners[..., [2, 1]],
+                                  mode=mode,
+                                  padding_mode=padding_mode,
+                                  align_corners=align_corners)
+        btm_left = F.grid_sample(integral_img,
+                                 bbox_corners[..., [0, 3]],
+                                 mode=mode,
+                                 padding_mode=padding_mode,
+                                 align_corners=align_corners)
 
         # Compute voxel features (ignore features which are not visible)
         vox_feats = (top_left + btm_right - top_right - btm_left) / area
         vox_feats = vox_feats * visible.float()
         vox_feats = vox_feats.view(1, features.shape[1], -1, depth, width)
-        point_features = vox_feats.permute([0, 1, 2, 4, 3]).reshape(1, features.shape[1], 1, -1)
+        point_features = vox_feats.permute([0, 1, 2, 4, 3
+                                            ]).reshape(1, features.shape[1], 1,
+                                                       -1)
 
     if valid_flag:
         # (N, )
         valid = (coor_x.squeeze() < w) & (coor_x.squeeze() > 0) & (
-            coor_y.squeeze() < h) & (coor_y.squeeze() > 0) & (
-                depths > 0)
+            coor_y.squeeze() < h) & (coor_y.squeeze() > 0) & (depths > 0)
         valid_features = point_features.squeeze().t()
         valid_features[~valid] = 0
         return valid_features, valid  # (N, C), (N,)
