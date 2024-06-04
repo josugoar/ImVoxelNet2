@@ -20,23 +20,20 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Get a detector flops')
     parser.add_argument('config', help='train config file path')
     parser.add_argument('--infos', help='Infos file with annotations')
-    parser.add_argument(
-        '--cam-type',
-        type=str,
-        default='CAM2',
-        help='choose camera type to inference')
-    parser.add_argument(
-        '--shape',
-        type=int,
-        nargs='+',
-        default=[1248, 384],
-        help='input point cloud size')
-    parser.add_argument(
-        '--modality',
-        type=str,
-        default='image',
-        choices=['point', 'image', 'multi'],
-        help='input data modality')
+    parser.add_argument('--cam-type',
+                        type=str,
+                        default='CAM2',
+                        help='choose camera type to inference')
+    parser.add_argument('--shape',
+                        type=int,
+                        nargs='+',
+                        default=[1248, 384],
+                        help='input point cloud size')
+    parser.add_argument('--modality',
+                        type=str,
+                        default='image',
+                        choices=['point', 'image', 'multi'],
+                        help='input data modality')
     parser.add_argument(
         '--cfg-options',
         nargs='+',
@@ -52,10 +49,10 @@ def parse_args():
 
 
 def input_constructor(input_key,
-                            model,
-                            input_shape,
-                            ann_file=None,
-                            cam_type=None):
+                      model,
+                      input_shape,
+                      ann_file=None,
+                      cam_type=None):
     try:
         batch = torch.ones(()).new_empty(
             (1, *input_shape),
@@ -71,8 +68,7 @@ def input_constructor(input_key,
     else:
         data_list = mmengine.load(ann_file)['data_list']
         data_info = data_list[0]
-        metainfo = dict(img_shape=input_shape,
-                        **data_info['images'][cam_type])
+        metainfo = dict(img_shape=input_shape, **data_info['images'][cam_type])
 
     return dict(inputs={input_key: batch},
                 data_samples=[Det3DDataSample(metainfo=metainfo)])
@@ -108,14 +104,14 @@ def main():
         model.cuda()
     model.eval()
 
-    flops, params = get_model_complexity_info(
-        model,
-        input_shape,
-        input_constructor=partial(input_constructor,
-                                  model,
-                                  input_key,
-                                  ann_file=args.infos,
-                                  cam_type=args.cam_type))
+    flops, params = get_model_complexity_info(model,
+                                              input_shape,
+                                              input_constructor=partial(
+                                                  input_constructor,
+                                                  model,
+                                                  input_key,
+                                                  ann_file=args.infos,
+                                                  cam_type=args.cam_type))
     split_line = '=' * 30
     print(f'{split_line}\nInput shape: {input_shape}\n'
           f'Flops: {flops}\nParams: {params}\n{split_line}')
