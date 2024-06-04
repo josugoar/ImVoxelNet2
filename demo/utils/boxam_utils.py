@@ -15,9 +15,9 @@ from mmcv.transforms import Compose
 from mmdet.utils import ConfigType
 from mmengine.config import Config
 from mmengine.dataset import pseudo_collate
-from mmengine.structures import InstanceData
 from mmengine.registry import init_default_scope
 from mmengine.runner import load_checkpoint
+from mmengine.structures import InstanceData
 from torch import Tensor
 
 from mmdet3d.apis import convert_SyncBN
@@ -143,9 +143,8 @@ def reshape_transform(feats: Union[Tensor, List[Tensor]],
     activations = []
     for feat in feats:
         activations.append(
-            torch.nn.functional.interpolate(torch.abs(feat),
-                                            max_shape,
-                                            mode='bilinear'))
+            torch.nn.functional.interpolate(
+                torch.abs(feat), max_shape, mode='bilinear'))
 
     activations = torch.cat(activations, axis=1)
     return activations
@@ -172,7 +171,6 @@ class BoxAMDetectorWrapper(nn.Module):
 
         new_test_pipeline = []
         for pipeline in pipeline_cfg:
-            # FIX: AttributeError: 'InstanceData' object has no attribute 'bboxes_3d'
             if pipeline['type'].endswith('Pack3DDetInputs'):
                 pipeline['keys'].extend([
                     'gt_bboxes', 'gt_bboxes_labels', 'gt_bboxes_3d',
@@ -210,31 +208,29 @@ class BoxAMDetectorWrapper(nn.Module):
                 pred_instances.bboxes_3d.gravity_center.numpy(force=True),
                 data_info['images'][cam_type]['cam2img'],
                 with_depth=True)
-            data = dict(img=self.image,
-                        img_id=0,
-                        **data_info['images'][cam_type],
-                        box_type_3d=box_type_3d,
-                        box_mode_3d=box_mode_3d,
-                        gt_bboxes=box3d_to_bbox(
-                            pred_instances.bboxes_3d.tensor.numpy(force=True),
-                            data_info['images'][cam_type]['cam2img']),
-                        gt_bboxes_labels=pred_instances.labels_3d,
-                        gt_bboxes_3d=pred_instances.bboxes_3d,
-                        gt_labels_3d=pred_instances.labels_3d,
-                        centers_2d=centers_2d_with_depth[:, :2],
-                        depths=centers_2d_with_depth[:, 2])
+            data = dict(
+                img=self.image,
+                img_id=0,
+                **data_info['images'][cam_type],
+                box_type_3d=box_type_3d,
+                box_mode_3d=box_mode_3d,
+                gt_bboxes=box3d_to_bbox(
+                    pred_instances.bboxes_3d.tensor.numpy(force=True),
+                    data_info['images'][cam_type]['cam2img']),
+                gt_bboxes_labels=pred_instances.labels_3d,
+                gt_bboxes_3d=pred_instances.bboxes_3d,
+                gt_labels_3d=pred_instances.labels_3d,
+                centers_2d=centers_2d_with_depth[:, :2],
+                depths=centers_2d_with_depth[:, 2])
             data = self.test_pipeline(data)
         else:
-            data = dict(img=self.image,
-                        img_id=0,
-                        **data_info['images'][cam_type],
-                        box_type_3d=box_type_3d,
-                        box_mode_3d=box_mode_3d)
+            data = dict(
+                img=self.image,
+                img_id=0,
+                **data_info['images'][cam_type],
+                box_type_3d=box_type_3d,
+                box_mode_3d=box_mode_3d)
             data = self.test_pipeline(data)
-            # FIX: KeyError: 'imgs'
-            data['inputs'] = data['inputs']
-            data['data_samples'] = data['data_samples']
-        # FIX: AssertionError: The input of `ImgDataPreprocessor` should be a NCHW tensor or a list of tensor, but got a tensor with shape: torch.Size([C, H, W])
         data = pseudo_collate([data])
         self.input_data = data
 
@@ -355,9 +351,8 @@ class BoxAMDetectorVisualizer:
         else:
             renormalized_am = grayscale_am
 
-        am_image_renormalized = show_cam_on_image(image / 255,
-                                                  renormalized_am,
-                                                  use_rgb=False)
+        am_image_renormalized = show_cam_on_image(
+            image / 255, renormalized_am, use_rgb=False)
 
         image_with_bounding_boxes = self._draw_boxes(
             boxes, labels, am_image_renormalized,
@@ -382,13 +377,14 @@ class BoxAMDetectorVisualizer:
             else:
                 text = self.classes[label]
 
-            cv2.putText(image,
-                        text, (int(box[0]), int(box[1] - 5)),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5,
-                        color,
-                        1,
-                        lineType=cv2.LINE_AA)
+            cv2.putText(
+                image,
+                text, (int(box[0]), int(box[1] - 5)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                color,
+                1,
+                lineType=cv2.LINE_AA)
         return image
 
 
@@ -494,7 +490,6 @@ class DetBoxScoreTarget:
             pred_scores_3d = pred_instances_3d.scores_3d
             pred_labels_3d = pred_instances_3d.labels_3d
 
-            # FIX: AssertionError: Indexing on Boxes with (slice(None, None, None), 2) failed to return a matrix!
             pred_bboxes_3d = pred_bboxes_3d.tensor
 
             for focal_box, focal_label in zip(self.focal_bboxes_3d,

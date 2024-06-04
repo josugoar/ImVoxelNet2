@@ -18,7 +18,8 @@ def auto_arrange_images(image_list: list, image_column: int = 2) -> np.ndarray:
         # arrange image according to image_column
         image_row = round(img_count / image_column)
         fill_img_list = [np.ones(image_list[0].shape, dtype=np.uint8) * 255
-                         ] * (image_row * image_column - img_count)
+                         ] * (
+                             image_row * image_column - img_count)
         image_list.extend(fill_img_list)
         merge_imgs_col = []
         for i in range(image_row):
