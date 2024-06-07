@@ -51,8 +51,8 @@ def parse_args():
     return args
 
 
-def input_constructor(input_key,
-                      model,
+def input_constructor(model,
+                      input_key,
                       input_shape,
                       ann_file=None,
                       cam_type=None):
