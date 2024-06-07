@@ -3,21 +3,25 @@ import os
 from typing import Sequence
 
 import mmcv
+import mmengine
+from mmdet.utils.misc import get_file_list
 from mmengine import Config, DictAction
 from mmengine.registry import init_default_scope
+from mmengine.utils import ProgressBar
 
-from mmdet3d.apis import inference_mono_3d_detector as inference_detector
-from mmdet3d.apis import init_model as init_detector
+from mmdet3d.apis import init_model
 from mmdet3d.registry import VISUALIZERS
+from .apis import inference_mono_3d_detector
 from .utils.misc import auto_arrange_images
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Visualize feature map')
-    parser.add_argument('img', help='Image path.')
+    parser.add_argument(
+        'img', help='Image path, include image file, dir and URL.')
     parser.add_argument('infos', help='Infos file with annotations')
     parser.add_argument('config', help='Config file')
-    parser.add_argument('checkpoint', help='Checkpoint file')
+    parser.add_argument('checkpoint', nargs='?', help='Checkpoint file')
     parser.add_argument(
         '--cam-type',
         type=str,
@@ -87,9 +91,10 @@ class ActivationsWrapper:
     def save_activation(self, module, input, output):
         self.activations.append(output)
 
-    def __call__(self, img_path, ann_file, cam_type):
+    def __call__(self, img_path, data_info, cam_type):
         self.activations = []
-        results = inference_detector(self.model, img_path, ann_file, cam_type)
+        results = inference_mono_3d_detector(self.model, img_path, data_info,
+                                             cam_type)
         return results, self.activations
 
     def release(self):
@@ -111,7 +116,7 @@ def main():
         channel_reduction = None
     assert len(args.arrangement) == 2
 
-    model = init_detector(args.config, args.checkpoint, device=args.device)
+    model = init_model(args.config, args.checkpoint, device=args.device)
 
     if not os.path.exists(args.out_dir) and not args.show:
         os.mkdir(args.out_dir)
@@ -134,58 +139,68 @@ def main():
 
     # init visualizer
     visualizer = VISUALIZERS.build(model.cfg.visualizer)
-    visualizer.dataset_meta = model.dataset_meta
+    if hasattr(model, 'dataset_meta'):
+        visualizer.dataset_meta = model.dataset_meta
 
-    image_path = args.img
+    # get file list
+    image_list, source_type = get_file_list(args.img)
+    data_list = mmengine.load(args.infos)['data_list']
 
-    result, featmaps = activations_wrapper(image_path, args.infos,
-                                           args.cam_type)
-    if not isinstance(featmaps, Sequence):
-        featmaps = [featmaps]
+    progress_bar = ProgressBar(len(image_list))
+    for index, image_path in enumerate(image_list):
+        data_info = data_list[index]
+        result, featmaps = activations_wrapper(image_path, data_info,
+                                               args.cam_type)
+        if not isinstance(featmaps, Sequence):
+            featmaps = [featmaps]
 
-    flatten_featmaps = []
-    for featmap in featmaps:
-        if isinstance(featmap, Sequence):
-            flatten_featmaps.extend(featmap)
+        flatten_featmaps = []
+        for featmap in featmaps:
+            if isinstance(featmap, Sequence):
+                flatten_featmaps.extend(featmap)
+            else:
+                flatten_featmaps.append(featmap)
+
+        img = mmcv.imread(image_path)
+        img = mmcv.imconvert(img, 'bgr', 'rgb')
+
+        if source_type['is_dir']:
+            filename = os.path.relpath(image_path, args.img).replace('/', '_')
         else:
-            flatten_featmaps.append(featmap)
+            filename = os.path.basename(image_path)
+        out_file = None if args.show else os.path.join(args.out_dir, filename)
 
-    img = mmcv.imread(image_path)
-    img = mmcv.imconvert(img, 'bgr', 'rgb')
+        # show the results
+        shown_imgs = []
+        visualizer.add_datasample(
+            'result',
+            dict(img=img),
+            data_sample=result,
+            draw_gt=False,
+            show=False,
+            wait_time=0,
+            out_file=None,
+            vis_task='mono_det',
+            pred_score_thr=args.score_thr)
+        drawn_img = visualizer.get_image()
 
-    filename = os.path.basename(image_path)
-    out_file = None if args.show else os.path.join(args.out_dir, filename)
+        for featmap in flatten_featmaps:
+            shown_img = visualizer.draw_featmap(
+                featmap[0],
+                drawn_img,
+                channel_reduction=channel_reduction,
+                topk=args.topk,
+                arrangement=args.arrangement)
+            shown_imgs.append(shown_img)
 
-    # show the results
-    shown_imgs = []
-    visualizer.add_datasample(
-        'result',
-        dict(img=img),
-        data_sample=result,
-        draw_gt=False,
-        show=False,
-        wait_time=0,
-        out_file=None,
-        vis_task='mono_det',
-        pred_score_thr=args.score_thr)
-    drawn_img = visualizer.get_image()
+        shown_imgs = auto_arrange_images(shown_imgs)
 
-    for featmap in flatten_featmaps:
-        shown_img = visualizer.draw_featmap(
-            featmap[0],
-            drawn_img,
-            channel_reduction=channel_reduction,
-            topk=args.topk,
-            arrangement=args.arrangement)
-        shown_imgs.append(shown_img)
+        progress_bar.update()
+        if out_file:
+            mmcv.imwrite(shown_imgs[..., ::-1], out_file)
 
-    shown_imgs = auto_arrange_images(shown_imgs)
-
-    if out_file:
-        mmcv.imwrite(shown_imgs[..., ::-1], out_file)
-
-    if args.show:
-        visualizer.show(shown_imgs)
+        if args.show:
+            visualizer.show(shown_imgs)
 
     if not args.show:
         print(f'All done!'
