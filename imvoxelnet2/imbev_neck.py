@@ -7,15 +7,9 @@ from mmdet3d.registry import MODELS
 
 @MODELS.register_module()
 class ImBEVNeck(BaseModule):
-    """Neck for ImVoxelNet outdoor scenario.
-
-    Args:
-        in_channels (int): Number of channels in an input tensor.
-        out_channels (int): Number of channels in all output tensors.
-    """
 
     def __init__(self, in_channels, out_channels):
-        super(ImBEVNeck, self).__init__()
+        super().__init__()
         self.model = nn.Sequential(
             ResModule(in_channels, in_channels),
             ConvModule(
@@ -46,30 +40,14 @@ class ImBEVNeck(BaseModule):
                 act_cfg=dict(type='ReLU', inplace=True)))
 
     def forward(self, x):
-        """Forward function.
-
-        Args:
-            x (torch.Tensor): of shape (N, C_in * N_z, N_y, N_x).
-
-        Returns:
-            list[torch.Tensor]: of shape (N, C_out, N_y, N_x).
-        """
         x = self.model.forward(x)
         return [x]
 
     def init_weights(self):
-        """Initialize weights of neck."""
         pass
 
 
 class ResModule(nn.Module):
-    """2d residual block for ImBEVNeck.
-
-    Args:
-        in_channels (int): Number of channels in input tensor.
-        out_channels (int): Number of channels in output tensor.
-        stride (int, optional): Stride of the block. Defaults to 1.
-    """
 
     def __init__(self, in_channels, out_channels, stride=1):
         super().__init__()
@@ -104,14 +82,6 @@ class ResModule(nn.Module):
         self.activation = nn.ReLU(inplace=True)
 
     def forward(self, x):
-        """Forward function.
-
-        Args:
-            x (torch.Tensor): of shape (N, C * N_z, N_y, N_x).
-
-        Returns:
-            torch.Tensor: 4d feature map.
-        """
         identity = x
         x = self.conv0(x)
         x = self.conv1(x)
