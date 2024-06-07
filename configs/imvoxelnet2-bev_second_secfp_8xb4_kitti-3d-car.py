@@ -1,4 +1,4 @@
-_base_ = './imvoxelnet2_8xb4_kitti-3d-car.py'
+_base_ = './imvoxelnet_8xb4_kitti-3d-car.py'
 
 model = dict(
     backbone_3d=dict(
