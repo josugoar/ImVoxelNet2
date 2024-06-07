@@ -5,22 +5,27 @@ from functools import partial
 
 import cv2
 import mmcv
+import mmengine
+from mmdet.utils.misc import get_file_list
 from mmengine import Config, DictAction, MessageHub
+from mmengine.utils import ProgressBar
 
 try:
-    from pytorch_grad_cam import AblationCAM, EigenCAM
+    from pytorch_grad_cam import AblationCAM, EigenCAM, ScoreCAM
 except ImportError:
     raise ImportError('Please run `pip install "grad-cam"` to install '
                       'pytorch_grad_cam package.')
 
-from .utils.boxam_utils import (BoxAMDetectorVisualizer, BoxAMDetectorWrapper,
-                                DetAblationLayer, DetBoxScoreTarget, GradCAM,
+from .utils.boxam_utils import (BoxAMMono3DDetectorVisualizer,
+                                BoxAMMono3DDetectorWrapper,
+                                Mono3DDetAblationLayer,
+                                Mono3DDetBoxScoreTarget, GradCAM,
                                 GradCAMPlusPlus, reshape_transform)
 
 GRAD_FREE_METHOD_MAP = {
     'ablationcam': AblationCAM,
     'eigencam': EigenCAM,
-    # 'scorecam': ScoreCAM, # consumes too much memory
+    'scorecam': ScoreCAM  # consumes too much memory
 }
 
 GRAD_BASED_METHOD_MAP = {'gradcam': GradCAM, 'gradcam++': GradCAMPlusPlus}
@@ -36,10 +41,11 @@ message_hub.runtime_info['epoch'] = 0
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Visualize Box AM')
-    parser.add_argument('img', help='Image path.')
+    parser.add_argument(
+        'img', help='Image path, include image file, dir and URL.')
     parser.add_argument('infos', help='Infos file with annotations')
     parser.add_argument('config', help='Config file')
-    parser.add_argument('checkpoint', help='Checkpoint file')
+    parser.add_argument('checkpoint', nargs='?', help='Checkpoint file')
     parser.add_argument(
         '--cam-type',
         type=str,
@@ -58,11 +64,11 @@ def parse_args():
         f'{", ".join(ALL_SUPPORT_METHODS)}.')
     parser.add_argument(
         '--target-layers',
-        default=['neck.fpn_convs[-1]'],
+        default=['backbone.layer4'],
         nargs='+',
         type=str,
         help='The target layers to get Box AM, if not set, the tool will '
-        'specify the neck.fpn_convs[-1]')
+        'specify the backbone.layer4')
     parser.add_argument(
         '--out-dir', default='./output', help='Path to output file')
     parser.add_argument(
@@ -109,7 +115,7 @@ def parse_args():
         help='batch of inference of AblationCAM')
     parser.add_argument(
         '--ratio-channels-to-ablate',
-        type=int,
+        type=float,
         default=0.5,
         help='Making it much faster of AblationCAM. '
         'The parameter controls how many channels should be ablated')
@@ -124,7 +130,7 @@ def init_detector_and_visualizer(args, cfg):
         max_shape = [args.max_shape]
     assert len(max_shape) == 1 or len(max_shape) == 2
 
-    model_wrapper = BoxAMDetectorWrapper(
+    model_wrapper = BoxAMMono3DDetectorWrapper(
         cfg, args.checkpoint, args.score_thr, device=args.device)
 
     if args.preview_model:
@@ -143,7 +149,7 @@ def init_detector_and_visualizer(args, cfg):
 
     ablationcam_extra_params = {
         'batch_size': args.batch_size,
-        'ablation_layer': DetAblationLayer(),
+        'ablation_layer': Mono3DDetAblationLayer(),
         'ratio_channels_to_ablate': args.ratio_channels_to_ablate
     }
 
@@ -154,7 +160,7 @@ def init_detector_and_visualizer(args, cfg):
         method_class = GRAD_FREE_METHOD_MAP[args.method]
         is_need_grad = False
 
-    boxam_detector_visualizer = BoxAMDetectorVisualizer(
+    boxam_detector_visualizer = BoxAMMono3DDetectorVisualizer(
         method_class,
         model_wrapper,
         target_layers,
@@ -180,36 +186,43 @@ def main():
     model_wrapper, boxam_detector_visualizer = init_detector_and_visualizer(
         args, cfg)
 
-    image_path = args.img
+    # get file list
+    image_list, source_type = get_file_list(args.img)
+    data_list = mmengine.load(args.infos)['data_list']
 
-    image = cv2.imread(image_path)
-    model_wrapper.set_input_data(image, args.infos, args.cam_type)
+    progress_bar = ProgressBar(len(image_list))
 
-    # forward detection results
-    result = model_wrapper()[0]
+    for index, image_path in enumerate(image_list):
+        image = cv2.imread(image_path)
+        data_info = data_list[index]
+        model_wrapper.set_input_data(image, data_info, args.cam_type)
 
-    pred_instances_3d = result.pred_instances_3d
-    # Get candidate predict info with score threshold
-    pred_instances_3d = pred_instances_3d[pred_instances_3d.scores_3d >
-                                          args.score_thr]
+        # forward detection results
+        result = model_wrapper()[0]
 
-    if len(pred_instances_3d) == 0:
-        warnings.warn('empty detection results! skip this')
-    else:
+        pred_instances = result.pred_instances_3d
+        # Get candidate predict info with score threshold
+        pred_instances = pred_instances[pred_instances.scores_3d >
+                                        args.score_thr]
+
+        if len(pred_instances) == 0:
+            warnings.warn('empty detection results! skip this')
+            continue
+
         if args.topk > 0:
-            pred_instances_3d = pred_instances_3d[:args.topk]
+            pred_instances = pred_instances[:args.topk]
 
         targets = [
-            DetBoxScoreTarget(
-                pred_instances_3d,
+            Mono3DDetBoxScoreTarget(
+                pred_instances,
                 device=args.device,
                 ignore_loss_params=ignore_loss_params)
         ]
 
         if args.method in GRAD_BASED_METHOD_MAP:
             model_wrapper.need_loss(True)
-            model_wrapper.set_input_data(image, args.infos, args.cam_type,
-                                         pred_instances_3d)
+            model_wrapper.set_input_data(image, data_info, args.cam_type,
+                                         pred_instances)
             boxam_detector_visualizer.switch_activations_and_grads(
                 model_wrapper)
 
@@ -217,17 +230,18 @@ def main():
         grayscale_boxam = boxam_detector_visualizer(image, targets=targets)
 
         # draw cam on image
-        pred_instances_3d = pred_instances_3d.numpy()
-        cam2img = model_wrapper.input_data['data_samples'][0].metainfo[
-            'cam2img']
+        pred_instances = pred_instances.numpy()
         image_with_bounding_boxes = boxam_detector_visualizer.show_am(
             image,
-            pred_instances_3d,
+            pred_instances,
             grayscale_boxam,
-            cam2img,
+            data_info['images'][args.cam_type]['cam2img'],
             with_norm_in_bboxes=args.norm_in_bbox)
 
-        filename = os.path.basename(image_path)
+        if source_type['is_dir']:
+            filename = os.path.relpath(image_path, args.img).replace('/', '_')
+        else:
+            filename = os.path.basename(image_path)
         out_file = None if args.show else os.path.join(args.out_dir, filename)
 
         if out_file:
@@ -242,6 +256,8 @@ def main():
             model_wrapper.need_loss(False)
             boxam_detector_visualizer.switch_activations_and_grads(
                 model_wrapper)
+
+        progress_bar.update()
 
     if not args.show:
         print(f'All done!'

@@ -7,7 +7,6 @@ from typing import Callable, List, Optional, Tuple, Union
 
 import cv2
 import mmcv
-import mmengine
 import numpy as np
 import torch
 import torch.nn as nn
@@ -36,11 +35,11 @@ except ImportError:
     pass
 
 
-def init_detector(config: Union[str, Path, Config],
-                  checkpoint: Optional[str] = None,
-                  device: str = 'cuda:0',
-                  palette: str = 'none',
-                  cfg_options: Optional[dict] = None):
+def init_model(config: Union[str, Path, Config],
+               checkpoint: Optional[str] = None,
+               device: str = 'cuda:0',
+               palette: str = 'none',
+               cfg_options: Optional[dict] = None):
     """Initialize a model from config file, which could be a 3D detector or a
     3D segmentor.
 
@@ -101,6 +100,8 @@ def init_detector(config: Union[str, Path, Config],
                     'palette does not exist, random is used by default. '
                     'You can also set the palette to customize.')
                 model.dataset_meta['palette'] = 'random'
+    else:
+        model.dataset_meta = {'classes': config.class_names}
 
     model.cfg = config  # save the config in the model for convenience
     if device != 'cpu':
@@ -150,8 +151,8 @@ def reshape_transform(feats: Union[Tensor, List[Tensor]],
     return activations
 
 
-class BoxAMDetectorWrapper(nn.Module):
-    """Wrap the mmdet model class to facilitate handling of non-tensor
+class BoxAMMono3DDetectorWrapper(nn.Module):
+    """Wrap the mmdet3d model class to facilitate handling of non-tensor
     situations during inference."""
 
     def __init__(self,
@@ -164,7 +165,7 @@ class BoxAMDetectorWrapper(nn.Module):
         self.device = device
         self.score_thr = score_thr
         self.checkpoint = checkpoint
-        self.detector = init_detector(self.cfg, self.checkpoint, device=device)
+        self.detector = init_model(self.cfg, self.checkpoint, device=device)
 
         pipeline_cfg = copy.deepcopy(self.cfg.test_dataloader.dataset.pipeline)
         pipeline_cfg[0].type = 'mmdet3d.LoadImageFromNDArray'
@@ -190,33 +191,31 @@ class BoxAMDetectorWrapper(nn.Module):
 
     def set_input_data(self,
                        image: np.ndarray,
-                       ann_file: str,
-                       cam_type: str,
+                       data_info: dict,
+                       cam_type: str = 'CAM_FRONT',
                        pred_instances: Optional[InstanceData] = None):
         """Set the input data to be used in the next step."""
         self.image = image
-
-        data_list = mmengine.load(ann_file)['data_list']
-        data_info = data_list[0]
-
-        box_type_3d, box_mode_3d = get_box_type('camera')
+        mono_img_info = data_info['images'][cam_type]
+        box_type_3d, box_mode_3d = get_box_type(
+            self.cfg.test_dataloader.dataset.box_type_3d)
 
         if self.is_need_loss:
             assert pred_instances is not None
             pred_instances = pred_instances.numpy()
             centers_2d_with_depth = points_cam2img(
                 pred_instances.bboxes_3d.gravity_center.numpy(force=True),
-                data_info['images'][cam_type]['cam2img'],
+                mono_img_info['cam2img'],
                 with_depth=True)
             data = dict(
                 img=self.image,
                 img_id=0,
-                **data_info['images'][cam_type],
+                **mono_img_info,
                 box_type_3d=box_type_3d,
                 box_mode_3d=box_mode_3d,
                 gt_bboxes=box3d_to_bbox(
                     pred_instances.bboxes_3d.tensor.numpy(force=True),
-                    data_info['images'][cam_type]['cam2img']),
+                    mono_img_info['cam2img']),
                 gt_bboxes_labels=pred_instances.labels_3d,
                 gt_bboxes_3d=pred_instances.bboxes_3d,
                 gt_labels_3d=pred_instances.labels_3d,
@@ -227,7 +226,7 @@ class BoxAMDetectorWrapper(nn.Module):
             data = dict(
                 img=self.image,
                 img_id=0,
-                **data_info['images'][cam_type],
+                **mono_img_info,
                 box_type_3d=box_type_3d,
                 box_mode_3d=box_mode_3d)
             data = self.test_pipeline(data)
@@ -262,12 +261,20 @@ class BoxAMDetectorWrapper(nn.Module):
                 self.detector.bbox_head.head_module.training = False
             else:
                 self.detector.bbox_head.training = False
+            data_ = {}
+            data_['inputs'] = self.input_data['inputs']
+            data_['data_samples'] = self.input_data['data_samples']
+            if args:
+                inputs = args[0]
+                batch_size = inputs.shape[0]
+                data_['inputs']['img'] *= batch_size
+                data_['data_samples'] *= batch_size
             with torch.no_grad():
-                results = self.detector.test_step(self.input_data)
+                results = self.detector.test_step(data_)
                 return results
 
 
-class BoxAMDetectorVisualizer:
+class BoxAMMono3DDetectorVisualizer:
     """Box AM visualization class."""
 
     def __init__(self,
@@ -323,18 +330,18 @@ class BoxAMDetectorVisualizer:
 
     def show_am(self,
                 image: np.ndarray,
-                pred_instance_3d: InstanceData,
+                pred_instance: InstanceData,
                 grayscale_am: np.ndarray,
                 cam2img: np.ndarray,
                 with_norm_in_bboxes: bool = False):
         """Normalize the AM to be in the range [0, 1] inside every bounding
         boxes, and zero outside of the bounding boxes."""
 
-        bboxes_3d = pred_instance_3d.bboxes_3d
-        labels_3d = pred_instance_3d.labels_3d
-
-        boxes = box3d_to_bbox(bboxes_3d.tensor.numpy(force=True), cam2img)
-        labels = labels_3d
+        boxes = box3d_to_bbox(
+            pred_instance.bboxes_3d.tensor.numpy(force=True), cam2img)
+        boxes[..., 0::2] = np.clip(boxes[..., 0::2], 0, image.shape[1])
+        boxes[..., 1::2] = np.clip(boxes[..., 1::2], 0, image.shape[0])
+        labels = pred_instance.labels_3d
 
         if with_norm_in_bboxes is True:
             boxes = boxes.astype(np.int32)
@@ -356,7 +363,7 @@ class BoxAMDetectorVisualizer:
 
         image_with_bounding_boxes = self._draw_boxes(
             boxes, labels, am_image_renormalized,
-            pred_instance_3d.get('scores_3d'))
+            pred_instance.get('scores_3d'))
         return image_with_bounding_boxes
 
     def _draw_boxes(self,
@@ -388,7 +395,7 @@ class BoxAMDetectorVisualizer:
         return image
 
 
-class DetAblationLayer(AblationLayer):
+class Mono3DDetAblationLayer(AblationLayer):
     """Det AblationLayer."""
 
     def __init__(self):
@@ -432,7 +439,7 @@ class DetAblationLayer(AblationLayer):
         return result
 
 
-class DetBoxScoreTarget:
+class Mono3DDetBoxScoreTarget:
     """Det Score calculation class.
 
     In the case of the grad-free method, the calculation method is that
@@ -450,19 +457,19 @@ class DetBoxScoreTarget:
     """
 
     def __init__(self,
-                 pred_instance_3d: InstanceData,
+                 pred_instance: InstanceData,
                  match_iou_thr: float = 0.5,
                  device: str = 'cuda:0',
                  ignore_loss_params: Optional[List] = None):
-        self.focal_bboxes_3d = pred_instance_3d.bboxes_3d
-        self.focal_labels_3d = pred_instance_3d.labels_3d
+        self.focal_bboxes = pred_instance.bboxes_3d
+        self.focal_labels = pred_instance.labels_3d
         self.match_iou_thr = match_iou_thr
         self.device = device
         if ignore_loss_params is not None:
             self.ignore_loss_params = ignore_loss_params
+            assert isinstance(self.ignore_loss_params, list)
         else:
             self.ignore_loss_params = []
-        assert isinstance(self.ignore_loss_params, list)
 
     def __call__(self, results):
         output = torch.tensor([0.], device=self.device)
@@ -482,25 +489,23 @@ class DetBoxScoreTarget:
         else:
             # grad-free method
             # results is DetDataSample
-            pred_instances_3d = results.pred_instances_3d
-            if len(pred_instances_3d) == 0:
+            pred_instances = results.pred_instances_3d
+            if len(pred_instances) == 0:
                 return output
 
-            pred_bboxes_3d = pred_instances_3d.bboxes_3d
-            pred_scores_3d = pred_instances_3d.scores_3d
-            pred_labels_3d = pred_instances_3d.labels_3d
+            pred_bboxes = pred_instances.bboxes_3d.tensor
+            pred_scores = pred_instances.scores_3d
+            pred_labels = pred_instances.labels_3d
 
-            pred_bboxes_3d = pred_bboxes_3d.tensor
-
-            for focal_box, focal_label in zip(self.focal_bboxes_3d,
-                                              self.focal_labels_3d):
+            for focal_box, focal_label in zip(self.focal_bboxes,
+                                              self.focal_labels):
                 ious = mmcv.ops.boxes_iou3d(focal_box[None],
-                                            pred_bboxes_3d[..., :7])
+                                            pred_bboxes[..., :7])
                 index = ious.argmax()
-                if ious[0, index] > self.match_iou_thr and pred_labels_3d[
+                if ious[0, index] > self.match_iou_thr and pred_labels[
                         index] == focal_label:
                     # TODO: Adaptive adjustment of weights based on algorithms
-                    score = ious[0, index] + pred_scores_3d[index]
+                    score = ious[0, index] + pred_scores[index]
                     output = output + score
             return output
 
