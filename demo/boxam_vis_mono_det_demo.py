@@ -11,7 +11,7 @@ from mmengine import Config, DictAction, MessageHub
 from mmengine.utils import ProgressBar
 
 try:
-    from pytorch_grad_cam import AblationCAM, EigenCAM, ScoreCAM
+    from pytorch_grad_cam import AblationCAM, EigenCAM
 except ImportError:
     raise ImportError('Please run `pip install "grad-cam"` to install '
                       'pytorch_grad_cam package.')
@@ -25,7 +25,7 @@ from .utils.boxam_utils import (BoxAMMono3DDetectorVisualizer,
 GRAD_FREE_METHOD_MAP = {
     'ablationcam': AblationCAM,
     'eigencam': EigenCAM,
-    'scorecam': ScoreCAM  # consumes too much memory
+    # 'scorecam': ScoreCAM  # consumes too much memory
 }
 
 GRAD_BASED_METHOD_MAP = {'gradcam': GradCAM, 'gradcam++': GradCAMPlusPlus}

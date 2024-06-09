@@ -21,7 +21,8 @@ from torch import Tensor
 
 from mmdet3d.apis import convert_SyncBN
 from mmdet3d.registry import DATASETS, MODELS
-from mmdet3d.structures import box3d_to_bbox, get_box_type, points_cam2img
+from mmdet3d.structures import (Box3DMode, box3d_to_bbox, get_box_type,
+                                points_cam2img)
 
 try:
     from pytorch_grad_cam import (AblationCAM, AblationLayer,
@@ -267,8 +268,12 @@ class BoxAMMono3DDetectorWrapper(nn.Module):
             if args:
                 inputs = args[0]
                 batch_size = inputs.shape[0]
-                data_['inputs']['img'] *= batch_size
-                data_['data_samples'] *= batch_size
+                data_['inputs']['img'] = [
+                    data_['inputs']['img'][0] for _ in range(batch_size)
+                ]
+                data_['data_samples'] = [
+                    data_['data_samples'][0] for _ in range(batch_size)
+                ]
             with torch.no_grad():
                 results = self.detector.test_step(data_)
                 return results
@@ -338,7 +343,9 @@ class BoxAMMono3DDetectorVisualizer:
         boxes, and zero outside of the bounding boxes."""
 
         boxes = box3d_to_bbox(
-            pred_instance.bboxes_3d.tensor.numpy(force=True), cam2img)
+            pred_instance.bboxes_3d.convert_to(
+                Box3DMode.CAM, correct_yaw=True).tensor.numpy(force=True),
+            cam2img)
         boxes[..., 0::2] = np.clip(boxes[..., 0::2], 0, image.shape[1])
         boxes[..., 1::2] = np.clip(boxes[..., 1::2], 0, image.shape[0])
         labels = pred_instance.labels_3d
