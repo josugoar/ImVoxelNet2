@@ -41,14 +41,16 @@ class MonoDet3DTTAModel(BaseTTAModel):
             cam2img = img_info['cam2img']
 
             if flip:
-                assert flip_direction == 'horizontal'
-
                 centers_2d_with_depth = points_cam2img(
                     bboxes_3d.center.numpy(force=True),
                     cam2img,
                     with_depth=True)
-                centers_2d_with_depth[:, 0] = ori_shape[
-                    1] - centers_2d_with_depth[:, 0]
+                if flip_direction == 'horizontal':
+                    centers_2d_with_depth[:, 0] = ori_shape[
+                        1] - centers_2d_with_depth[:, 0]
+                elif flip_direction == 'vertical':
+                    centers_2d_with_depth[:, 1] = ori_shape[
+                        0] - centers_2d_with_depth[:, 1]
 
                 bboxes_3d.tensor[:, :3] = bboxes_3d.tensor.new_tensor(
                     points_img2cam(centers_2d_with_depth, cam2img))
