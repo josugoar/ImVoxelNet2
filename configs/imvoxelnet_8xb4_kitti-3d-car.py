@@ -53,18 +53,15 @@ auto_scale_lr = dict(enable=True, base_batch_size=32)
 default_hooks = dict(
     checkpoint=dict(type='CheckpointHook', interval=2, max_keep_ckpts=-1))
 
-vis_backends = [dict(type='TensorboardVisBackend')]
+vis_backends = [
+    dict(type='LocalVisBackend'),
+    dict(type='TensorboardVisBackend')
+]
 visualizer = dict(
     type='Det3DLocalVisualizer', vis_backends=vis_backends, name='visualizer')
 
 tta_model = dict(
     type='MonoDet3DTTAModel',
-    num_classes=1,
+    num_classes=3,
     tta_cfg=dict(
-        use_rotate_nms=True,
-        nms_across_levels=False,
-        nms_pre=100,
-        nms_thr=0.05,
-        score_thr=0.001,
-        min_bbox_size=0,
-        max_per_img=20))
+        use_rotate_nms=True, nms_thr=0.05, score_thr=0.001, max_per_img=20))
