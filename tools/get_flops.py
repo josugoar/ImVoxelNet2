@@ -66,16 +66,18 @@ def input_constructor(model,
         # like `nn.Relu()`, `nn.AvgPool2d`, etc.
         batch = torch.ones(()).new_empty((1, *input_shape))
 
-    if ann_file is None:
-        metainfo = None
-    else:
+    metainfo = None
+    if ann_file is not None:
         data_list = mmengine.load(ann_file)['data_list']
         data_info = data_list[0]
         metainfo = dict(img_shape=input_shape, **data_info['images'][cam_type])
 
-    return dict(
-        inputs={input_key: batch},
-        data_samples=[Det3DDataSample(metainfo=metainfo)])
+    inputs = {}
+    inputs[input_key] = batch
+    data_samples = [Det3DDataSample(metainfo=metainfo)]
+    input = dict(inputs=inputs, data_samples=data_samples)
+
+    return input
 
 
 def main():
