@@ -51,7 +51,8 @@ train_cfg = dict(val_interval=2)
 auto_scale_lr = dict(enable=True, base_batch_size=32)
 
 default_hooks = dict(
-    checkpoint=dict(type='CheckpointHook', interval=2, max_keep_ckpts=-1))
+    checkpoint=dict(type='CheckpointHook', interval=2, max_keep_ckpts=-1),
+    visualization=dict(type='BEVDet3DVisualizationHook'))
 
 vis_backends = [
     dict(type='LocalVisBackend'),
