@@ -7,14 +7,15 @@ from mmdet3d.structures import points_cam2img, points_img2cam
 from mmdet3d.utils import array_converter
 
 
-@array_converter(apply_to=('points_3d', 'proj_mat'))
+@array_converter(apply_to=('bboxes', 'cam2img'))
 def bbox3d_flip(bboxes: Union[Tensor, np.ndarray],
                 cam2img: Union[Tensor, np.ndarray],
                 img_shape: Tuple[int],
                 direction: str = 'horizontal',
                 with_yaw: bool = True) -> Union[Tensor, np.ndarray]:
-    centers_2d_with_depth = points_cam2img(
-        bboxes[:, :3], cam2img, with_depth=True)
+    centers_2d_with_depth = bboxes.new_tensor(
+        points_cam2img(
+            bboxes[:, :3].numpy(force=True), cam2img, with_depth=True))
     if direction == 'horizontal':
         centers_2d_with_depth[:,
                               0] = img_shape[1] - centers_2d_with_depth[:, 0]

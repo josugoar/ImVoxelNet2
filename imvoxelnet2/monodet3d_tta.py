@@ -83,7 +83,7 @@ class MonoDet3DTTAModel(BaseTTAModel):
         for data_sample in data_samples:
             bboxes_3d = data_sample.pred_instances_3d.bboxes_3d
             aug_bboxes_3d.append(bboxes_3d)
-            num_bboxes = data_sample.shape[0]
+            num_bboxes = bboxes_3d.shape[0]
             labels = data_sample.pred_instances_3d.labels_3d
             indices = labels.new_tensor(list(range(num_bboxes)))
             scores = bboxes_3d.tensor.new_zeros(
