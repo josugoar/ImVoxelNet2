@@ -1,7 +1,7 @@
 # ImVoxelNet++
 
 <p align="center">
-  <img src="assets/imvoxelnet2.png" alt="argdeco" width="1280" height="320" />
+  <img src="assets/imvoxelnet2.png" alt="imvoxelnet2" width="1280" height="320" />
 </p>
 
 <h1></h1>
