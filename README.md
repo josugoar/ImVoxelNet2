@@ -1,4 +1,4 @@
-# ImVoxelNet++
+# imvoxelnet2
 
 <p align="center">
   <img src="assets/imvoxelnet2.png" alt="imvoxelnet2" width="1280" height="320" />
