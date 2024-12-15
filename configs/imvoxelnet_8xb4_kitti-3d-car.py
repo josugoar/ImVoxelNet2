@@ -1,6 +1,6 @@
 _base_ = 'mmdet3d::imvoxelnet/imvoxelnet_8xb4_kitti-3d-car.py'
 
-custom_imports = dict(imports=['projects.ImVoxelNet2.imvoxelnet2'])
+custom_imports = dict(imports=['projects.imvoxelnet2.imvoxelnet2'])
 
 model = dict(type='ImVoxelNet2')
 
