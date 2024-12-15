@@ -6,7 +6,16 @@
 
 <h1></h1>
 
-> Image to Bird's Eye View Projection for Monocular General-Purpose 3D Object Detection 
+> Image to Bird's Eye View Projection for Monocular General-Purpose 3D Object Detection
+
+## Usage
+
+```sh
+# Clone MMDetection3D
+git clone https://github.com/open-mmlab/mmdetection3d.git
+# Clone ImVoxelNet2 to the correctly named directory in the projects folder
+git clone https://github.com/josugoar/imvoxelnet2.git projects/ImVoxelNet2
+```
 
 ## [Weights](https://drive.google.com/drive/folders/1ce1w8c4vzSpj-GNz3PPrfdEepjvrQQDm?usp=sharing)
 
